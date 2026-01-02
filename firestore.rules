@@ -1,0 +1,42 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users can read/write their own user document
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Allow reading companies and products for browsing
+    match /companies/{companyId} {
+      allow read: if true; // Public read access for browsing
+      allow write: if request.auth != null && 
+        (request.auth.uid == resource.data.ownerId || 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+    }
+    
+    match /companies/{companyId}/products/{productId} {
+      allow read: if true; // Public read access for browsing
+      allow write: if request.auth != null && 
+        (request.auth.uid == get(/databases/$(database)/documents/companies/$(companyId)).data.ownerId ||
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+    }
+    
+    // Questionnaires and responses
+    match /questionnaires/{questionnaireId} {
+      allow read: if true; // Public read access
+      allow write: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    match /responses/{responseId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == request.resource.data.userId;
+    }
+    
+    match /aggregatedScores/{scoreId} {
+      allow read: if true; // Public read access for displaying scores
+      allow write: if false; // Only updated by cloud functions
+    }
+  }
+}
